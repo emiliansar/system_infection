@@ -1,0 +1,10 @@
+[project]
+name = "system-infection-release-2-0"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "icecream>=2.2.0",
+    "pygame>=2.6.1",
+]
