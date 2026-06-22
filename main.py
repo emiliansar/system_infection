@@ -4,6 +4,7 @@ from pygame.locals import QUIT
 
 from classes.class_Game import Game
 from classes.class_MainMenu import MainMenu
+from classes.class_PauseMenu import PauseMenu
 
 pg.init()
 
@@ -16,9 +17,10 @@ fps = 60
 print(f"Screen: {scr}")
 print(f"Screen type: {type(scr)}")
 
-# Состояния игры: 'menu', 'game'
+# Состояния игры: 'menu', 'game', 'pause'
 game_state = 'menu'
 main_menu = MainMenu(scr)
+pause_menu = PauseMenu(scr)
 game = None
 
 while True:
@@ -26,9 +28,6 @@ while True:
     
     for event in events:
         if event.type == QUIT:
-            pg.quit()
-            exit()
-        if event.type == pg.KEYDOWN and event.key == pg.K_ESCAPE:
             pg.quit()
             exit()
     
@@ -48,6 +47,12 @@ while True:
     
     # ---------- ИГРА ----------
     elif game_state == 'game':
+        # Обработка ESC для паузы
+        for event in events:
+            if event.type == pg.KEYDOWN and event.key == pg.K_ESCAPE:
+                game_state = 'pause'
+                break
+        
         result = game.handle_events(events)
         
         # Если игрок нажал "Выход в главное меню"
@@ -58,6 +63,32 @@ while True:
         
         game.move()
         game.draw()
+    
+    # ---------- ПАУЗА ----------
+    elif game_state == 'pause':
+        # Рисуем игру на фоне (замороженную)
+        game.draw()
+        
+        # Поверх рисуем меню паузы
+        pause_menu.draw()
+        
+        for event in events:
+            # ESC возвращает в игру
+            if event.type == pg.KEYDOWN and event.key == pg.K_ESCAPE:
+                game_state = 'game'
+                break
+            
+            # Обработка кликов по меню паузы
+            if event.type == pg.MOUSEBUTTONDOWN and event.button == 1:
+                action = pause_menu.handle_click(event.pos)
+                if action == 'continue':
+                    game_state = 'game'
+                elif action == 'menu':
+                    game_state = 'menu'
+                    game = None
+                elif action == 'quit':
+                    pg.quit()
+                    exit()
     
     pg.display.update()
     clock.tick(fps)
