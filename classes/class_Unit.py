@@ -4,7 +4,7 @@ from icecream import ic
 from random import choice
 from pygame.image import load
 
-from config import types, colors, names, figures, icons
+from config import types, colors, names, figures, icons, hp
 
 from classes.class_Cell import Cell
 
@@ -16,9 +16,10 @@ class Unit:
         cell_size,
         can_move_down,
         can_move_left,
-        can_move_right
+        can_move_right,
     ):
         self.type = 'unit'
+        self.unit_id = 0
 
         self.place_unit_in_grid = place_unit_in_grid
         self.can_move_down = can_move_down
@@ -31,12 +32,17 @@ class Unit:
         self.generate()
     
     def generate(self):
+        self.unit_id += 1
+        
         self.unit_type = choice(types)
         self.bg_color = colors[self.unit_type]
         self.unit_name = choice(names[self.unit_type])
+        self.unit_hp = hp[self.unit_name]
         self.layout_figure = figures[choice(list(figures.keys()))]
+        ic(self.layout_figure)
         
-        self.icon = choice(icons[self.unit_type])
+        # self.icon = choice(icons[self.unit_type])
+        self.icon = icons[self.unit_name]
         self.icon_path = f'images/{self.icon}'
         
         self.image = load(self.icon_path).convert_alpha()
@@ -69,7 +75,9 @@ class Unit:
                         self.bg_color,
                         self.image,
                         self.unit_type,
-                        self.unit_name
+                        self.unit_name,
+                        self.unit_hp,
+                        self.unit_id
                     )
         
         return figure
@@ -111,21 +119,3 @@ class Unit:
     
     def rotate(self):
         self.figure = [list(row) for row in zip(*self.figure[::-1])]
-        # ic("rotate was called")
-        
-        # # ic(self.figure)
-        
-        # matrix = [
-        #     [
-        #         0 for _ in range(len(self.figure[0]))
-        #     ] for _ in range(len(self.figure))
-        # ]
-        
-        # ic(matrix)
-        
-        # for i in range(len(self.figure)):
-        #     for j in range(len(self.figure[0])):
-        #         print(f"Берём элемент фигуры: [{i}][{j}]")
-        #         matrix[j][i] = self.figure[i][j]
-        
-        # ic(matrix)

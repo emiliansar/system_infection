@@ -12,14 +12,16 @@ set_caption("Заражение системы")
 clock = pg.time.Clock()
 fps = 60
 
-
 print(f"Screen: {scr}")
 print(f"Screen type: {type(scr)}")
 
 game = Game(scr)
 
 while True:
-    for event in pg.event.get():
+    # ---------- ИЗМЕНЕНО ----------
+    events = pg.event.get()
+    
+    for event in events:
         if event.type == QUIT:
             pg.quit()
             exit()
@@ -27,6 +29,8 @@ while True:
             pg.quit()
             exit()
     
+    # Передаём события в game
+    game.handle_events(events)
     game.move()
     game.draw()
     

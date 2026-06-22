@@ -23,6 +23,7 @@
 # -- 12) ~~Сделать переворот фигуры~~
 # 12) Урон
 # -- 1) ~~Хорошие наносят урон плохим и на оборот~~
+# -- 2) ~~Назначить каждому юниту и клетке, свои HP и ID~~
 # 13) Способности
 # -- 1) Написать блок способностей
 
@@ -71,11 +72,16 @@ class Battlefield:
             self.can_move_down,
             self.can_move_left,
             self.can_move_right
-        )        
+        )
+        
+        self.mission_points = 0
         
         self.frame_counter = 0
         self.move_delay = 30
         self.press_delay = 3
+        
+        # 👇 ДОБАВИТЬ ЭТУ СТРОКУ
+        self.game_over = False
     
     def move(self):
         self.frame_counter += 1
@@ -101,38 +107,33 @@ class Battlefield:
                 x = self.field_x + col * self.cell_size + (col * 5)
                 y = self.field_y + row * self.cell_size + (row * 5)
                 
-                # self.scr.blit(self.grid[row][col].image, (x, y))
+                current_cell = self.grid[row][col]
                 
-                # pg.draw.rect(
-                #     self.scr,
-                #     self.grid[row][col].bg_color,
-                #     (
-                #         x, y,
-                #         self.cell_size, self.cell_size
-                #     )
-                # )
+                # if current_cell.type == 'baked':
+                #     if current_cell.unit_hp <= 0:
+                #        current_cell = Cell() 
                 
-                if self.grid[row][col].type == 'cell':
+                if current_cell.type == 'cell':
                     pg.draw.rect(
                         self.scr,
-                        self.grid[row][col].bg_color,
+                        current_cell.bg_color,
                         (
                             x, y,
                             self.cell_size, self.cell_size
                         )
                     )
                 
-                if self.grid[row][col].type == 'unit' or self.grid[row][col].type == 'baked':
+                if current_cell.type == 'unit' or current_cell.type == 'baked':
                     pg.draw.rect(
                         self.scr,
-                        self.grid[row][col].bg_color,
+                        current_cell.bg_color,
                         (
                             x, y,
                             self.cell_size, self.cell_size
                         )
                     )
                     
-                    self.scr.blit(self.grid[row][col].image, (x, y))
+                    self.scr.blit(current_cell.image, (x, y))
     
     def clear_grid(self):
         for row in range(self.rows):
@@ -140,10 +141,11 @@ class Battlefield:
                 if self.grid[row][col].type == 'unit':
                     self.grid[row][col] = Cell()
 
-    def can_move_down(self, figure, grid_row, grid_col):
+    def can_move_down(self, figure, grid_row, grid_col):                
         for unit_row, row in enumerate(figure):
             for unit_col, cell in enumerate(row):
                 if cell.type == 'unit':
+                    
                     next_row = grid_row + unit_row
                     next_col = grid_col + unit_col
 
@@ -158,15 +160,19 @@ class Battlefield:
                     current_cell = self.grid[grid_row + unit_row - 1][grid_col + unit_col]
                     next_cell = self.grid[next_row][next_col]
 
-                    # if next_cell.type != 'cell' and next_cell.type != 'unit':
                     if next_cell.type == 'baked':
                         if next_cell.unit_type != current_cell.unit_type:
-                            ic('#' * 100)
-                            ic(next_cell.unit_type)
-                            ic(current_cell.unit_type)
                             
-                            next_cell = Cell()
-                            continue
+                            self.mission_points += self.get_size_by_id(next_cell.unit_id)
+                            
+                            self.delete_cell_by_id(next_cell.unit_id)
+                            self.unit.generate()
+                        
+                            is_wall_bottom = False
+                            is_move_down = True
+                            
+                            return is_wall_bottom, is_move_down
+                            
                     
                         self.baking_cells()
                         
@@ -213,7 +219,92 @@ class Battlefield:
                         return False
         
         return True
-                    
+
+    def delete_cell_by_id(self, id):
+        for row in range(self.rows):
+            for col in range(self.cols):
+                if self.grid[row][col].unit_id == id:
+                    self.grid[row][col] = Cell()
+    
+    def get_size_by_id(self, id):
+        size = 0
+        
+        for row in range(self.rows):
+            for col in range(self.cols):
+                if self.grid[row][col].unit_id == id:
+                    size += 1
+        
+        return size
+
+    def get_cell_at(self, pos):
+        """
+        Возвращает (row, col) клетки по координатам мыши.
+        Если клик вне поля — возвращает (None, None).
+        """
+        mx, my = pos
+        if not (self.field_x <= mx <= self.field_x + self.field_width and
+                self.field_y <= my <= self.field_y + self.field_height):
+            return None, None
+
+        # Обратная формула к draw():
+        # x = field_x + col * cell_size + col * 5
+        # => col = (mx - field_x) // (cell_size + 5)
+        col = (mx - self.field_x) // (self.cell_size + 5)
+        row = (my - self.field_y) // (self.cell_size + 5)
+
+        if not (0 <= row < self.rows and 0 <= col < self.cols):
+            return None, None
+
+        # Проверим, что клик попал именно в клетку, а не в промежуток (5px)
+        cell_x = self.field_x + col * self.cell_size + col * 5
+        cell_y = self.field_y + row * self.cell_size + row * 5
+        if not (cell_x <= mx <= cell_x + self.cell_size and
+                cell_y <= my <= cell_y + self.cell_size):
+            return None, None
+
+        return row, col
+
+    def apply_ability(self, ability_key, row, col):
+        """
+        Применяет способность к клетке (row, col).
+        Возвращает True, если способность успешно применена
+        (чтобы Abilities знали, что можно списать очки).
+        """
+        if ability_key == 'delete_1':
+            return self._delete_1(row, col)
+        elif ability_key == 'delete_9':
+            return self._delete_9(row, col)
+        elif ability_key == 'reset':
+            return self._reset()
+        return False
+
+    def _delete_1(self, row, col):
+        cell = self.grid[row][col]
+        if cell.type != 'baked':
+            return False
+        self.grid[row][col] = Cell()
+        return True
+
+    def _delete_9(self, row, col):
+        """Удаляет 3x3 вокруг (row, col). Успех — если удалена хотя бы 1 baked-клетка."""
+        deleted_any = False
+        for dr in (-1, 0, 1):
+            for dc in (-1, 0, 1):
+                r, c = row + dr, col + dc
+                if 0 <= r < self.rows and 0 <= c < self.cols:
+                    if self.grid[r][c].type == 'baked':
+                        self.grid[r][c] = Cell()
+                        deleted_any = True
+        return deleted_any
+
+    def _reset(self):
+        """Полный сброс поля — победа."""
+        self.grid = [
+            [Cell() for _ in range(self.cols)] for _ in range(self.rows)
+        ]
+        self.unit.generate()
+        self.game_over = True
+        return True
     
     def place_unit_in_grid(
         self,
@@ -238,10 +329,13 @@ class Battlefield:
                 
                 self.grid[row][col] = Cell(
                     'baked',
-                    (0, 255, 0),
+                    # (0, 255, 0),
+                    self.grid[row][col].bg_color,
                     self.grid[row][col].image,
                     self.grid[row][col].unit_type,
-                    self.grid[row][col].unit_name
+                    self.grid[row][col].unit_name,
+                    self.grid[row][col].unit_hp,
+                    self.grid[row][col].unit_id
                 )
         
         self.unit.generate()
