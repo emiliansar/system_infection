@@ -32,6 +32,10 @@ class Unit:
         self.generate()
     
     def generate(self):
+        """
+        Генерирует новый юнит.
+        Возвращает True если юнит успешно заспавнился, False если нет места.
+        """
         self.unit_id += 1
         
         self.unit_type = choice(types)
@@ -41,7 +45,6 @@ class Unit:
         self.layout_figure = figures[choice(list(figures.keys()))]
         ic(self.layout_figure)
         
-        # self.icon = choice(icons[self.unit_type])
         self.icon = icons[self.unit_name]
         self.icon_path = f'images/{self.icon}'
         
@@ -56,7 +59,30 @@ class Unit:
         self.grid_row = 0
         self.grid_col = (len(self.grid[0]) - len(self.figure[0])) // 2
         
+        # 👇 ИЗМЕНЕНО: проверяем, можно ли заспавниться
+        if not self.can_spawn():
+            return False
+        
         self.place_unit_in_grid(self.figure, self.grid_row, self.grid_col)
+        return True
+    
+    def can_spawn(self):
+        """
+        Проверяет, можно ли заспавнить юнит в текущей позиции.
+        Возвращает True если все клетки фигуры находятся на пустых клетках.
+        """
+        for unit_row, row in enumerate(self.figure):
+            for unit_col, cell in enumerate(row):
+                if cell.type == 'unit':
+                    check_row = self.grid_row + unit_row
+                    check_col = self.grid_col + unit_col
+                    
+                    if check_row >= len(self.grid) or check_col >= len(self.grid[0]):
+                        return False
+                    
+                    if self.grid[check_row][check_col].type != 'cell':
+                        return False
+        return True
     
     def generate_figure(self):
         figure = [

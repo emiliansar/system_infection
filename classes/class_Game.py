@@ -4,6 +4,7 @@ from pygame.locals import MOUSEBUTTONDOWN
 from classes.class_Battlefield import Battlefield
 from classes.class_Abilities import Abilities
 from classes.class_VictoryScreen import VictoryScreen
+from classes.class_DefeatScreen import DefeatScreen
 
 class Game:
     def __init__(self, screen):
@@ -21,6 +22,7 @@ class Game:
             self.battlefield.field_height
         )
         self.victory_screen = VictoryScreen(self.scr)
+        self.defeat_screen = DefeatScreen(self.scr)  # 👇 ДОБАВЛЕНО
 
     def handle_events(self, events):
         for event in events:
@@ -30,13 +32,22 @@ class Game:
                     continue
 
                 if event.button == 1:
-                    # Если игра окончена — обрабатываем клик по окну победы
+                    # Если игра окончена — обрабатываем клик по экрану победы
                     if self.battlefield.game_over:
                         action = self.victory_screen.handle_click(event.pos)
                         if action == 'restart':
                             self.restart_game()
                         elif action == 'menu':
-                            return 'menu'  # Возвращаем сигнал для выхода в меню
+                            return 'menu'
+                        continue
+                    
+                    # 👇 ДОБАВЛЕНО: обработка экрана поражения
+                    if self.battlefield.defeat:
+                        action = self.defeat_screen.handle_click(event.pos)
+                        if action == 'restart':
+                            self.restart_game()
+                        elif action == 'menu':
+                            return 'menu'
                         continue
                     
                     # Обычная обработка кликов
@@ -57,7 +68,6 @@ class Game:
         return None
 
     def restart_game(self):
-        """Перезапуск игры."""
         self.battlefield = Battlefield(self.scr)
         self.abilities = Abilities(
             self.scr,
@@ -69,7 +79,7 @@ class Game:
         )
 
     def move(self):
-        if self.battlefield.game_over:
+        if self.battlefield.game_over or self.battlefield.defeat:
             return
         self.battlefield.move()
 
@@ -78,6 +88,10 @@ class Game:
         self.battlefield.draw()
         self.abilities.draw()
         
-        # Если игра окончена — рисуем экран победы поверх
+        # Если игра окончена — рисуем экран победы
         if self.battlefield.game_over:
             self.victory_screen.draw()
+        
+        # 👇 ДОБАВЛЕНО: рисуем экран поражения
+        if self.battlefield.defeat:
+            self.defeat_screen.draw()
