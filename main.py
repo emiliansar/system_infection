@@ -2,7 +2,7 @@ import pygame as pg
 from pygame.display import set_mode, set_caption
 from pygame.locals import QUIT
 
-from classes.class_Game import Game
+from classes.class_Game import Game, stop_overlay
 from classes.class_MainMenu import MainMenu
 from classes.class_PauseMenu import PauseMenu
 
@@ -28,6 +28,7 @@ while True:
     
     for event in events:
         if event.type == QUIT:
+            stop_overlay()  # Остановить overlay при выходе
             pg.quit()
             exit()
     
@@ -42,6 +43,7 @@ while True:
                     game_state = 'game'
                     game = Game(scr)
                 elif action == 'quit':
+                    stop_overlay()
                     pg.quit()
                     exit()
     
@@ -57,6 +59,7 @@ while True:
         
         # Если игрок нажал "Выход в главное меню"
         if result == 'menu':
+            stop_overlay()
             game_state = 'menu'
             game = None
             continue
@@ -84,13 +87,16 @@ while True:
                 if action == 'continue':
                     game_state = 'game'
                 elif action == 'menu':
+                    stop_overlay()
                     game_state = 'menu'
                     game = None
                 elif action == 'quit':
+                    stop_overlay()
                     pg.quit()
                     exit()
     
     pg.display.update()
     clock.tick(fps)
 
+stop_overlay()
 pg.quit()

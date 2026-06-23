@@ -1,10 +1,81 @@
 import pygame as pg
 from pygame.locals import MOUSEBUTTONDOWN
+import subprocess
+import sys
+import os
+from pathlib import Path
+import time
 
 from classes.class_Battlefield import Battlefield
 from classes.class_Abilities import Abilities
 from classes.class_VictoryScreen import VictoryScreen
 from classes.class_DefeatScreen import DefeatScreen
+
+# Путь к overlay
+GAME_DIR = Path(__file__).parent.parent.resolve()
+OVERLAY_DIR = GAME_DIR / 'overlay'
+OVERLAY_SCRIPT = OVERLAY_DIR / 'main.py'
+STATUS_FILE = OVERLAY_DIR / 'status.txt'
+
+# Процесс overlay
+_overlay_process = None
+_overlay_started = False
+
+def start_overlay():
+    """Запустить overlay в отдельном процессе"""
+    global _overlay_process, _overlay_started
+    
+    if _overlay_started and _overlay_process.poll() is None:
+        return  # Уже запущен и работает
+    
+    try:
+        STATUS_FILE.write_text('critical', encoding='utf-8')
+        time.sleep(0.1)  # Даём время записать файл
+        
+        _overlay_process = subprocess.Popen(
+            [sys.executable, str(OVERLAY_SCRIPT)],
+            cwd=str(OVERLAY_DIR),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            creationflags=subprocess.CREATE_NEW_CONSOLE if sys.platform == 'win32' else 0
+        )
+        _overlay_started = True
+        print(f"Overlay started with PID: {_overlay_process.pid}")
+    except Exception as e:
+        print(f"Failed to start overlay: {e}")
+        import traceback
+        traceback.print_exc()
+
+def stop_overlay():
+    """Остановить overlay"""
+    global _overlay_process, _overlay_started
+    
+    if _overlay_process:
+        try:
+            _overlay_process.terminate()
+            _overlay_process.wait(timeout=2)
+            print("Overlay terminated")
+        except subprocess.TimeoutExpired:
+            _overlay_process.kill()
+            print("Overlay killed")
+        except Exception as e:
+            print(f"Error stopping overlay: {e}")
+        finally:
+            _overlay_process = None
+    
+    _overlay_started = False
+    
+    try:
+        STATUS_FILE.write_text('normal', encoding='utf-8')
+    except Exception as e:
+        print(f"Error writing status: {e}")
+
+def is_overlay_running():
+    """Проверить, работает ли overlay"""
+    global _overlay_process
+    if _overlay_process is None:
+        return False
+    return _overlay_process.poll() is None
 
 class Game:
     def __init__(self, screen):
@@ -22,7 +93,7 @@ class Game:
             self.battlefield.field_height
         )
         self.victory_screen = VictoryScreen(self.scr)
-        self.defeat_screen = DefeatScreen(self.scr)  # 👇 ДОБАВЛЕНО
+        self.defeat_screen = DefeatScreen(self.scr)
 
     def handle_events(self, events):
         for event in events:
@@ -32,7 +103,6 @@ class Game:
                     continue
 
                 if event.button == 1:
-                    # Если игра окончена — обрабатываем клик по экрану победы
                     if self.battlefield.game_over:
                         action = self.victory_screen.handle_click(event.pos)
                         if action == 'restart':
@@ -41,7 +111,6 @@ class Game:
                             return 'menu'
                         continue
                     
-                    # 👇 ДОБАВЛЕНО: обработка экрана поражения
                     if self.battlefield.defeat:
                         action = self.defeat_screen.handle_click(event.pos)
                         if action == 'restart':
@@ -50,7 +119,6 @@ class Game:
                             return 'menu'
                         continue
                     
-                    # Обычная обработка кликов
                     if self.abilities.handle_click(event.pos):
                         continue
 
@@ -68,6 +136,7 @@ class Game:
         return None
 
     def restart_game(self):
+        stop_overlay()
         self.battlefield = Battlefield(self.scr)
         self.abilities = Abilities(
             self.scr,
@@ -79,8 +148,16 @@ class Game:
         )
 
     def move(self):
-        if self.battlefield.game_over or self.battlefield.defeat:
+        if self.battlefield.game_over:
             return
+        
+        if self.battlefield.defeat:
+            # Запускаем overlay только один раз
+            if not _overlay_started:
+                start_overlay()
+            # Останавливаем игру, пока overlay работает
+            return
+        
         self.battlefield.move()
 
     def draw(self):
@@ -88,10 +165,8 @@ class Game:
         self.battlefield.draw()
         self.abilities.draw()
         
-        # Если игра окончена — рисуем экран победы
         if self.battlefield.game_over:
             self.victory_screen.draw()
         
-        # 👇 ДОБАВЛЕНО: рисуем экран поражения
         if self.battlefield.defeat:
             self.defeat_screen.draw()
