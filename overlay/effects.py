@@ -1,228 +1,156 @@
-#!/usr/bin/env python3
 import random
 import math
 
-class GlitchEffect:
-    """Класс для управления глитч-эффектами"""
-    
-    def __init__(self, intensity=0.7):
+class GlitchEffects:
+    def __init__(self, intensity=0.5):
         self.intensity = intensity
-        self.offset_x = 0
-        self.offset_y = 0
-        self.rgb_offsets = [(0, 0), (0, 0), (0, 0)]
-        self.flicker_alpha = 255
-        self.artifacts = []
-        self.scanline_offset = 0
-        self.burst_active = False
-        self.burst_timer = 0
-        self.opacity = 1.0
-        self.visible = True
-        
-    def update(self, dt=16):
-        """Обновление эффектов"""
+        self._random = random.Random()
+        self._random.seed()
+        self._time = 0
+        self._jitter_offset = (0, 0)
+        self._rgb_offsets = [(0, 0), (0, 0), (0, 0)]
+        self._flicker_alpha = 255
+        self._artifacts = []
+        self._burst_active = False
+        self._burst_timer = 0
+        self._visible = True
+        self._opacity = 1.0
+
+    def update(self, delta_ms=50):
+        self._time += delta_ms
         self._update_jitter()
         self._update_rgb_split()
         self._update_flicker()
         self._update_artifacts()
-        self._update_scanlines()
-        self._update_burst(dt)
+        self._update_burst(delta_ms)
         self._update_opacity()
-    
+
     def _update_jitter(self):
-        """Обновление случайного смещения"""
-        if random.random() < 0.2 * self.intensity:
-            self.offset_x = random.randint(-15, 15) * self.intensity
-            self.offset_y = random.randint(-8, 8) * self.intensity
+        if self._random.random() < 0.3 * self.intensity:
+            self._jitter_offset = (
+                self._random.randint(-5, 5) * self.intensity,
+                self._random.randint(-3, 3) * self.intensity
+            )
         else:
-            self.offset_x *= 0.9
-            self.offset_y *= 0.9
-    
+            self._jitter_offset = (0, 0)
+
     def _update_rgb_split(self):
-        """Обновление разделения RGB каналов"""
-        if random.random() < 0.15 * self.intensity:
-            offset_range = int(10 * self.intensity)
-            self.rgb_offsets = [
-                (random.randint(-offset_range, offset_range),
-                 random.randint(-offset_range, offset_range))
+        if self._random.random() < 0.2 * self.intensity:
+            offset_range = int(8 * self.intensity)
+            self._rgb_offsets = [
+                (self._random.randint(-offset_range, offset_range),
+                 self._random.randint(-offset_range, offset_range))
                 for _ in range(3)
             ]
         else:
-            self.rgb_offsets = [
-                (int(x * 0.9), int(y * 0.9)) 
-                for x, y in self.rgb_offsets
-            ]
-    
+            self._rgb_offsets = [(int(x * 0.9), int(y * 0.9)) for x, y in self._rgb_offsets]
+
     def _update_flicker(self):
-        """Обновление мерцания"""
-        if random.random() < 0.1 * self.intensity:
-            self.flicker_alpha = random.randint(150, 255)
+        if self._random.random() < 0.15 * self.intensity:
+            self._flicker_alpha = self._random.randint(100, 255)
         else:
-            self.flicker_alpha = min(255, self.flicker_alpha + 8)
-    
+            self._flicker_alpha = min(255, self._flicker_alpha + 5)
+
     def _update_artifacts(self):
-        """Обновление артефактов (горизонтальных линий)"""
-        # Добавление новых артефактов
-        if random.random() < 0.2 * self.intensity:
-            y = random.randint(0, 800)
-            height = random.randint(2, 15)
-            width = random.randint(100, 600)
-            x = random.randint(0, 1920 - width)
-            alpha = random.randint(50, 180)
-            color = (
-                random.randint(0, 100),
-                random.randint(150, 255),
-                random.randint(0, 100)
-            )
-            self.artifacts.append([x, y, width, height, color, alpha])
-        
-        # Движение и удаление артефактов
-        for artifact in self.artifacts:
-            artifact[1] += 3  # Движение вниз
-            artifact[5] -= 1.5  # Уменьшение прозрачности
-        
-        # Удаление исчезнувших артефактов
-        self.artifacts = [
-            a for a in self.artifacts 
-            if a[5] > 0 and a[1] < 1080
-        ]
-        
-        # Ограничение количества
-        if len(self.artifacts) > 8:
-            self.artifacts = self.artifacts[-8:]
-    
-    def _update_scanlines(self):
-        """Обновление сканирующих линий"""
-        self.scanline_offset = (self.scanline_offset + 2) % 10
-    
-    def _update_burst(self, dt):
-        """Обновление вспышек"""
-        if self.burst_active:
-            self.burst_timer -= dt
-            if self.burst_timer <= 0:
-                self.burst_active = False
-        elif random.random() < 0.01 * self.intensity:
+        if self._random.random() < 0.25 * self.intensity:
+            y = self._random.randint(0, 800)
+            height = self._random.randint(2, 20)
+            width = self._random.randint(50, 400)
+            self._artifacts.append((y, height, width, self._random.randint(50, 200)))
+        if len(self._artifacts) > 10:
+            self._artifacts.pop(0)
+        self._artifacts = [(y, h, w, a - 5) for y, h, w, a in self._artifacts if a > 0]
+
+    def _update_burst(self, delta_ms):
+        if self._burst_active:
+            self._burst_timer -= delta_ms
+            if self._burst_timer <= 0:
+                self._burst_active = False
+        elif self._random.random() < 0.02 * self.intensity:
             self.trigger_burst()
-    
+
     def _update_opacity(self):
-        """Обновление общей прозрачности"""
-        if random.random() < 0.05:
-            if self.visible:
-                target = random.uniform(0.8, 1.0)
+        if self._random.random() < 0.1:
+            if self._visible:
+                target = self._random.uniform(0.7, 1.0)
             else:
                 target = 0.0
-            self.opacity += (target - self.opacity) * 0.1
-    
+            self._opacity += (target - self._opacity) * 0.1
+
+    @property
+    def jitter_offset(self): return self._jitter_offset
+
+    @property
+    def rgb_offsets(self): return self._rgb_offsets
+
+    @property
+    def flicker_alpha(self): return self._flicker_alpha
+
+    @property
+    def artifacts(self): return self._artifacts
+
+    @property
+    def opacity(self): return self._opacity
+
+    @property
+    def burst_active(self): return self._burst_active
+
     def trigger_burst(self):
-        """Триггер вспышки"""
-        self.burst_active = True
-        self.burst_timer = 150
-        self.flicker_alpha = 255
-    
+        self._burst_active = True
+        self._burst_timer = 200
+        self._flicker_alpha = 255
+
     def set_intensity(self, value):
-        """Установка интенсивности эффектов (0.0 - 1.0)"""
         self.intensity = max(0.0, min(1.0, value))
-    
+
     def set_visible(self, visible):
-        """Установка видимости"""
-        self.visible = visible
-    
-    @property
-    def jitter_offset(self):
-        """Получить смещение джиттера"""
-        return (int(self.offset_x), int(self.offset_y))
-    
-    @property
-    def rgb_offsets(self):
-        """Получить смещения RGB каналов"""
-        return self.rgb_offsets
-    
-    @property
-    def flicker_alpha(self):
-        """Получить альфа-канал мерцания"""
-        return self.flicker_alpha
-    
-    @property
-    def artifacts(self):
-        """Получить список артефактов"""
-        return self.artifacts
-    
-    @property
-    def scanline_y(self):
-        """Получить позицию сканирующей линии"""
-        return self.scanline_offset
-    
-    @property
-    def burst_active(self):
-        """Проверка активности вспышки"""
-        return self.burst_active
-    
-    @property
-    def opacity(self):
-        """Получить общую прозрачность"""
-        return self.opacity
+        self._visible = visible
 
 
 class AnimationController:
-    """Контроллер анимаций (fade in/out, пульсация)"""
-    
     def __init__(self):
-        self.fade_progress = 0.0
-        self.target_opacity = 0.0
-        self.fade_speed = 0.05
-        self.pulse_enabled = False
-        self.pulse_phase = 0.0
-        self.pulse_amplitude = 0.1
-        self.pulse_frequency = 2.0
-    
-    def update(self, dt=16):
-        """Обновление анимаций"""
-        # Fade эффект
-        diff = self.target_opacity - self.fade_progress
-        self.fade_progress += diff * self.fade_speed
-        
-        # Пульсация
-        if self.pulse_enabled:
-            self.pulse_phase += dt / 1000.0 * self.pulse_frequency
-    
+        self._fade_progress = 0.0
+        self._target_opacity = 0.0
+        self._fade_speed = 0.05
+        self._pulse_enabled = False
+        self._pulse_phase = 0.0
+        self._pulse_amplitude = 0.1
+        self._pulse_frequency = 2.0
+
+    def update(self, delta_ms=50):
+        diff = self._target_opacity - self._fade_progress
+        self._fade_progress += diff * self._fade_speed
+        if self._pulse_enabled:
+            self._pulse_phase += delta_ms / 1000.0 * self._pulse_frequency
+
     def get_current_opacity(self):
-        """Получить текущую прозрачность"""
-        base = self.fade_progress
-        if self.pulse_enabled:
-            pulse = math.sin(self.pulse_phase) * self.pulse_amplitude
+        base = self._fade_progress
+        if self._pulse_enabled:
+            pulse = math.sin(self._pulse_phase) * self._pulse_amplitude
             return max(0.0, min(1.0, base + pulse))
         return base
-    
+
     def fade_in(self, speed=0.05):
-        """Анимация появления"""
-        self.target_opacity = 1.0
-        self.fade_speed = speed
-    
+        self._target_opacity = 1.0
+        self._fade_speed = speed
+
     def fade_out(self, speed=0.05):
-        """Анимация исчезновения"""
-        self.target_opacity = 0.0
-        self.fade_speed = speed
-    
+        self._target_opacity = 0.0
+        self._fade_speed = speed
+
     def enable_pulse(self, amplitude=0.1, frequency=2.0):
-        """Включить пульсацию"""
-        self.pulse_enabled = True
-        self.pulse_amplitude = amplitude
-        self.pulse_frequency = frequency
-    
+        self._pulse_enabled = True
+        self._pulse_amplitude = amplitude
+        self._pulse_frequency = frequency
+
     def disable_pulse(self):
-        """Выключить пульсацию"""
-        self.pulse_enabled = False
-    
+        self._pulse_enabled = False
+
     @property
-    def is_fading_in(self):
-        """Проверка fading in"""
-        return self.target_opacity > self.fade_progress
-    
+    def is_fading_in(self): return self._target_opacity > self._fade_progress
+
     @property
-    def is_fading_out(self):
-        """Проверка fading out"""
-        return self.target_opacity < self.fade_progress
-    
+    def is_fading_out(self): return self._target_opacity < self._fade_progress
+
     @property
-    def is_visible(self):
-        """Проверка видимости"""
-        return self.fade_progress > 0.1
+    def is_visible(self): return self._fade_progress > 0.1
