@@ -11,8 +11,9 @@ from pygame.locals import QUIT, K_ESCAPE, KEYDOWN, RESIZABLE, FULLSCREEN, K_UP, 
 from pygame.key import get_pressed
 
 class Battlefield:
-    def __init__(self, screen):
+    def __init__(self, screen, sound_manager=None):
         self.scr = screen
+        self.sound_manager = sound_manager
         self.scr_width = self.scr.get_width()
         self.scr_height = self.scr.get_height()
         self.bg = (255, 255, 255)
@@ -108,7 +109,7 @@ class Battlefield:
                 if self.grid[row][col].type == 'unit':
                     self.grid[row][col] = Cell()
 
-    def can_move_down(self, figure, grid_row, grid_col):                
+    def can_move_down(self, figure, grid_row, grid_col):
         for unit_row, row in enumerate(figure):
             for unit_col, cell in enumerate(row):
                 if cell.type == 'unit':
@@ -129,21 +130,26 @@ class Battlefield:
 
                     if next_cell.type == 'baked':
                         if next_cell.unit_type != current_cell.unit_type:
+                            # 👇 Звук при столкновении РАЗНЫХ типов
+                            if hasattr(self, 'sound_manager'):
+                                self.sound_manager.play_negative_connect()
                             
                             self.mission_points += self.get_size_by_id(next_cell.unit_id)
                             
                             self.delete_cell_by_id(next_cell.unit_id)
-                            
-                            # 👇 ИЗМЕНЕНО: проверяем результат generate()
-                            if not self.unit.generate():
-                                self.defeat = True
-                            
+                            self.unit.generate()
+                        
                             is_wall_bottom = False
                             is_move_down = True
                             
                             return is_wall_bottom, is_move_down
                             
-                    
+                        
+                        # 👇 Звук при столкновении ОДИНАКОВЫХ типов
+                        if next_cell.unit_type == current_cell.unit_type:
+                            if hasattr(self, 'sound_manager'):
+                                self.sound_manager.play_positive_connect()
+                        
                         self.baking_cells()
                         
                         is_wall_bottom = False

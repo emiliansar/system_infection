@@ -9,6 +9,7 @@ from classes.class_Battlefield import Battlefield
 from classes.class_Abilities import Abilities
 from classes.class_VictoryScreen import VictoryScreen
 from classes.class_DefeatScreen import DefeatScreen
+from classes.class_SoundManager import SoundManager
 
 # Путь к файлу статуса и overlay
 GAME_DIR = Path(__file__).parent.parent.resolve()
@@ -65,12 +66,14 @@ def write_game_status(status):
 
 
 class Game:
-    def __init__(self, screen):
+    def __init__(self, screen, sound_manager=None):  # 👇 Добавлен sound_manager
         self.scr = screen
         self.width = self.scr.get_width()
         self.height = self.scr.get_height()
 
-        self.battlefield = Battlefield(self.scr)
+        self.sound_manager = sound_manager  # 👇 Сохраняем
+
+        self.battlefield = Battlefield(self.scr, sound_manager)  # 👇 Передаём
         self.abilities = Abilities(
             self.scr,
             self.battlefield,
@@ -82,8 +85,6 @@ class Game:
         self.victory_screen = VictoryScreen(self.scr)
         self.defeat_screen = DefeatScreen(self.scr)
         
-        # 👇 ВАЖНО: НЕ запускаем overlay при старте!
-        # Только пишем статус normal, чтобы если overlay уже запущен — он закрылся
         write_game_status('normal')
 
     def handle_events(self, events):
@@ -140,7 +141,6 @@ class Game:
         )
 
     def move(self):
-        # 👇 Overlay запускается ТОЛЬКО при поражении
         if self.battlefield.defeat:
             if not _overlay_started:
                 start_overlay()
